@@ -71,6 +71,7 @@ func makeServerFromMux(mux *http.ServeMux, isProd bool) *http.Server {
 func makeHTTPServer(isProd bool) *http.Server {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", handleIndex)
+	mux.HandleFunc("/favicon.ico", handleFavicon)
 	mux.HandleFunc("POST /api/weight", handlePostWeight)
 	mux.HandleFunc("GET /api/weights", handleGetWeights)
 
@@ -229,4 +230,8 @@ func handleGetWeights(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(weights)
+}
+
+func handleFavicon(w http.ResponseWriter, r *http.Request) {
+	http.ServeFile(w, r, "favicon.ico")
 }
