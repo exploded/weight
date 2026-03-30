@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"html/template"
 	"log/slog"
 	"net/http"
@@ -14,6 +16,8 @@ import (
 
 	"github.com/exploded/monitor/pkg/logship"
 )
+
+var discordWebhookURL string
 
 // Template cache
 var templates *template.Template
@@ -93,6 +97,8 @@ func main() {
 		httpPort = "8990"
 	}
 	httpPort = ":" + httpPort
+
+	discordWebhookURL = os.Getenv("DISCORD_WEBHOOK_URL")
 
 	// Set up log shipping to monitor portal
 	monitorURL := os.Getenv("MONITOR_URL")
@@ -207,6 +213,8 @@ func handlePostWeight(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	go notifyDiscord(weight)
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(weight)
@@ -234,4 +242,37 @@ func handleGetWeights(w http.ResponseWriter, r *http.Request) {
 
 func handleFavicon(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "favicon.ico")
+}
+
+func notifyDiscord(w Weight) {
+	if discordWebhookURL == "" {
+		return
+	}
+
+	payload := map[string]any{
+		"embeds": []map[string]any{{
+			"title":       fmt.Sprintf("%.1f kg", w.WeightKg),
+			"description": "New weight recorded",
+			"color":       0x3B82F6,
+			"timestamp":   w.CreatedAt,
+		}},
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		slog.Error("discord marshal", "error", err)
+		return
+	}
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Post(discordWebhookURL, "application/json", bytes.NewReader(body))
+	if err != nil {
+		slog.Error("discord send", "error", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		slog.Warn("discord webhook error", "status", resp.StatusCode)
+	}
 }
