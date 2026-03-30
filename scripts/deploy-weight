@@ -30,6 +30,11 @@ fi
 
 echo "[deploy] Stopping service..."
 systemctl stop weight || true
+# Reset failure counter to prevent auto-restart race
+systemctl reset-failed weight || true
+# Kill any lingering processes on the port
+fuser -k 8989/tcp 2>/dev/null || true
+sleep 1
 
 echo "[deploy] Installing binary to $DEPLOY_DIR/weight (owner: $SERVICE_USER:$SERVICE_GROUP)..."
 rm -f "$DEPLOY_DIR/weight"

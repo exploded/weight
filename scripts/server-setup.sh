@@ -79,6 +79,10 @@ PORT=8989
 # Database file path
 DB_PATH=/var/www/weight/weight.db
 
+# Monitor portal log shipping (optional)
+MONITOR_URL=
+MONITOR_API_KEY=
+
 # Discord webhook URL for new reading notifications (optional)
 # DISCORD_WEBHOOK_URL=
 ENV_TEMPLATE

@@ -1,8 +1,11 @@
 module weight
 
-go 1.25.0
+go 1.26.0
 
-require modernc.org/sqlite v1.48.0
+require (
+	github.com/exploded/monitor v0.0.0-20260327110231-668878fb1605
+	modernc.org/sqlite v1.48.0
+)
 
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
