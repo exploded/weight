@@ -73,8 +73,8 @@ else
 # Production flag
 PROD=True
 
-# Port the server listens on (default: 8989)
-PORT=8989
+# Port the server listens on (default: 8990)
+PORT=8990
 
 # Database file path
 DB_PATH=/var/www/weight/weight.db
@@ -213,13 +213,13 @@ if [ -f "$CADDY_FILE" ]; then
 
 # HTTPS — browser dashboard
 weight.mchugh.au {
-    reverse_proxy localhost:8989
+    reverse_proxy localhost:8990
 }
 
 # HTTP — ESP32 API (no TLS, device can't do HTTPS)
 http://weight.mchugh.au {
     handle /api/* {
-        reverse_proxy localhost:8989
+        reverse_proxy localhost:8990
     }
     handle {
         redir https://weight.mchugh.au{uri} permanent
@@ -234,11 +234,11 @@ else
     echo "       Add this to your Caddyfile manually:"
     echo ""
     echo "       weight.mchugh.au {"
-    echo "           reverse_proxy localhost:8989"
+    echo "           reverse_proxy localhost:8990"
     echo "       }"
     echo "       http://weight.mchugh.au {"
     echo "           handle /api/* {"
-    echo "               reverse_proxy localhost:8989"
+    echo "               reverse_proxy localhost:8990"
     echo "           }"
     echo "           handle {"
     echo "               redir https://weight.mchugh.au{uri} permanent"
