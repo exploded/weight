@@ -48,9 +48,13 @@ echo "[deploy] Verifying service is active..."
 sleep 2
 if ! systemctl is-active --quiet weight; then
     echo "[deploy] ERROR: Service failed to start. Status:"
-    systemctl status weight --no-pager --lines=30
+    systemctl status weight --no-pager --lines=30 || true
     echo "[deploy] Journal logs:"
-    journalctl -u weight --no-pager -n 30
+    journalctl -u weight --no-pager -n 30 || true
+    echo "[deploy] Env file check:"
+    ls -la "$DEPLOY_DIR/.env" 2>&1 || echo "No .env file found"
+    echo "[deploy] Directory listing:"
+    ls -la "$DEPLOY_DIR/" 2>&1
     exit 1
 fi
 
