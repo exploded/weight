@@ -51,7 +51,7 @@ type Weight struct {
 }
 
 func insertWeight(weightKg float64) (Weight, error) {
-	now := time.Now().UTC().Format("2006-01-02 15:04:05")
+	now := time.Now().UTC().Format(time.RFC3339)
 	result, err := db.Exec(
 		"INSERT INTO weights (weight_kg, created_at) VALUES (?, ?)",
 		weightKg, now,
@@ -97,6 +97,10 @@ func getWeights(days int) ([]Weight, error) {
 		if err := rows.Scan(&w.ID, &w.WeightKg, &w.CreatedAt); err != nil {
 			log.Printf("scan weight row: %v", err)
 			continue
+		}
+		// Normalize old "2006-01-02 15:04:05" format to RFC3339
+		if t, err := time.Parse("2006-01-02 15:04:05", w.CreatedAt); err == nil {
+			w.CreatedAt = t.UTC().Format(time.RFC3339)
 		}
 		weights = append(weights, w)
 	}
