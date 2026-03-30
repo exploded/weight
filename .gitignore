@@ -1,0 +1,30 @@
+# Environment files
+.env
+*.local.*
+
+# Go build artifacts
+/weight
+weight.exe
+
+# Backup files
+*.backup
+*.bak
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Database files
+*.db
+*.db-wal
+*.db-shm
+
+# Build directories
+dist/
