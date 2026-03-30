@@ -3,7 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -95,7 +95,7 @@ func getWeights(days int) ([]Weight, error) {
 	for rows.Next() {
 		var w Weight
 		if err := rows.Scan(&w.ID, &w.WeightKg, &w.CreatedAt); err != nil {
-			log.Printf("scan weight row: %v", err)
+			slog.Warn("scan weight row", "error", err)
 			continue
 		}
 		// Normalize old "2006-01-02 15:04:05" format to RFC3339

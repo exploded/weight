@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"html/template"
-	"log"
 	"log/slog"
 	"net/http"
 	"os"
@@ -24,7 +23,7 @@ func init() {
 	var err error
 	templates, err = template.ParseGlob("templates/*.html")
 	if err != nil {
-		log.Printf("Warning: Error parsing templates: %v", err)
+		slog.Warn("error parsing templates", "error", err)
 	}
 }
 
@@ -33,7 +32,7 @@ func requestLogger(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		next.ServeHTTP(w, r)
-		log.Printf("%s %s %s", r.Method, r.RequestURI, time.Since(start))
+		slog.Info("request", "method", r.Method, "uri", r.RequestURI, "duration", time.Since(start))
 	})
 }
 
@@ -76,7 +75,7 @@ func makeHTTPServer(isProd bool) *http.Server {
 	mux.HandleFunc("GET /api/weights", handleGetWeights)
 
 	path, _ := os.Getwd()
-	log.Printf("Working directory: %s", path)
+	slog.Info("working directory", "path", path)
 	fileServer := http.FileServer(http.Dir(path + "/static"))
 	mux.Handle("/static/", http.StripPrefix("/static/", cacheStaticAssets(fileServer)))
 
@@ -123,22 +122,22 @@ func main() {
 		dbPath = "weight.db"
 	}
 	if err := initDB(dbPath); err != nil {
-		log.Fatalf("Failed to initialize database: %v", err)
+		slog.Error("failed to initialize database", "error", err)
+		os.Exit(1)
 	}
 	defer closeDB()
 
-	log.Printf("Production: %v", isProd)
-	log.Printf("HTTP Port: %s", httpPort)
-	log.Printf("Database: %s", dbPath)
+	slog.Info("configuration", "prod", isProd, "port", httpPort, "db", dbPath)
 
 	httpSrv := makeHTTPServer(isProd)
 	httpSrv.Addr = httpPort
 
 	// Start server in goroutine
 	go func() {
-		log.Printf("Starting HTTP server on %s", httpSrv.Addr)
+		slog.Info("starting HTTP server", "addr", httpSrv.Addr)
 		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("httpSrv.ListenAndServe() failed: %v", err)
+			slog.Error("http server failed", "error", err)
+			os.Exit(1)
 		}
 	}()
 
@@ -146,16 +145,16 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	log.Println("Shutting down server...")
+	slog.Info("shutting down server")
 
 	// Give outstanding requests 5 seconds to complete
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := httpSrv.Shutdown(ctx); err != nil {
-		log.Printf("Server forced to shutdown: %v", err)
+		slog.Error("server forced to shutdown", "error", err)
 	}
 
-	log.Println("Server exited")
+	slog.Info("server exited")
 }
 
 func handleIndex(w http.ResponseWriter, r *http.Request) {
@@ -168,18 +167,18 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 
 	if templates != nil {
 		if err := templates.ExecuteTemplate(w, "index.html", nil); err != nil {
-			log.Printf("Error executing index template: %v", err)
+			slog.Error("error executing index template", "error", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		}
 	} else {
 		t, err := template.ParseFiles("templates/index.html")
 		if err != nil {
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			log.Printf("Error parsing index template: %v", err)
+			slog.Error("error parsing index template", "error", err)
 			return
 		}
 		if err := t.Execute(w, nil); err != nil {
-			log.Printf("Error executing index template: %v", err)
+			slog.Error("error executing index template", "error", err)
 		}
 	}
 }
@@ -202,7 +201,7 @@ func handlePostWeight(w http.ResponseWriter, r *http.Request) {
 
 	weight, err := insertWeight(req.WeightKg)
 	if err != nil {
-		log.Printf("Error inserting weight: %v", err)
+		slog.Error("error inserting weight", "error", err)
 		http.Error(w, `{"error":"failed to store reading"}`, http.StatusInternalServerError)
 		return
 	}
@@ -223,7 +222,7 @@ func handleGetWeights(w http.ResponseWriter, r *http.Request) {
 
 	weights, err := getWeights(days)
 	if err != nil {
-		log.Printf("Error getting weights: %v", err)
+		slog.Error("error getting weights", "error", err)
 		http.Error(w, `{"error":"failed to fetch readings"}`, http.StatusInternalServerError)
 		return
 	}
