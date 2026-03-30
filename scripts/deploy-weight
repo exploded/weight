@@ -44,6 +44,7 @@ chmod +x "$DEPLOY_DIR/weight"
 echo "[deploy] Updating web assets..."
 cp -r "$DEPLOY_SRC/templates/" "$DEPLOY_DIR/"
 cp -r "$DEPLOY_SRC/static/"    "$DEPLOY_DIR/"
+cp -f "$DEPLOY_SRC/favicon.ico" "$DEPLOY_DIR/" 2>/dev/null || true
 chown -R "$SERVICE_USER:$SERVICE_GROUP" "$DEPLOY_DIR"
 
 echo "[deploy] Starting service..."

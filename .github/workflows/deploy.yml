@@ -51,7 +51,7 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: ${{ secrets.DEPLOY_PORT || '22' }}
-          source: "weight,templates/,static/,scripts/deploy-weight"
+          source: "weight,favicon.ico,templates/,static/,scripts/deploy-weight"
           target: "/tmp/weight-deploy"
           overwrite: true
 
