@@ -12,8 +12,7 @@ function formatDate(dateStr) {
     return d.toLocaleDateString('en-AU', {
         day: '2-digit',
         month: 'short',
-        year: 'numeric',
-        timeZone: 'UTC'
+        year: 'numeric'
     });
 }
 
@@ -24,8 +23,7 @@ function formatDateTime(dateStr) {
         month: 'short',
         year: 'numeric',
         hour: '2-digit',
-        minute: '2-digit',
-        timeZone: 'UTC'
+        minute: '2-digit'
     });
 }
 
