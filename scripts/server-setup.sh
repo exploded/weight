@@ -211,8 +211,19 @@ if [ -f "$CADDY_FILE" ]; then
     else
         cat >> "$CADDY_FILE" << 'CADDY'
 
+# HTTPS — browser dashboard
 weight.mchugh.au {
     reverse_proxy localhost:8989
+}
+
+# HTTP — ESP32 API (no TLS, device can't do HTTPS)
+http://weight.mchugh.au {
+    handle /api/* {
+        reverse_proxy localhost:8989
+    }
+    handle {
+        redir https://weight.mchugh.au{uri} permanent
+    }
 }
 CADDY
         systemctl reload caddy
@@ -224,6 +235,14 @@ else
     echo ""
     echo "       weight.mchugh.au {"
     echo "           reverse_proxy localhost:8989"
+    echo "       }"
+    echo "       http://weight.mchugh.au {"
+    echo "           handle /api/* {"
+    echo "               reverse_proxy localhost:8989"
+    echo "           }"
+    echo "           handle {"
+    echo "               redir https://weight.mchugh.au{uri} permanent"
+    echo "           }"
     echo "       }"
 fi
 
