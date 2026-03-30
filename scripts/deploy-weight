@@ -47,6 +47,15 @@ cp -r "$DEPLOY_SRC/static/"    "$DEPLOY_DIR/"
 cp -f "$DEPLOY_SRC/favicon.ico" "$DEPLOY_DIR/" 2>/dev/null || true
 chown -R "$SERVICE_USER:$SERVICE_GROUP" "$DEPLOY_DIR"
 
+# One-off: import Apple Health weight data if import.sql is present
+IMPORT_SQL="$DEPLOY_SRC/scripts/import.sql"
+if [ -f "$IMPORT_SQL" ]; then
+    echo "[deploy] Importing historical weight data..."
+    command -v sqlite3 >/dev/null || apt-get install -y sqlite3
+    sqlite3 "$DEPLOY_DIR/weight.db" < "$IMPORT_SQL"
+    echo "[deploy] Imported $(wc -l < "$IMPORT_SQL") records"
+fi
+
 echo "[deploy] Starting service..."
 systemctl start weight
 
