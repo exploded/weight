@@ -7,8 +7,13 @@ async function fetchWeights(days) {
     return resp.json();
 }
 
+function parseUTC(dateStr) {
+    // SQLite format "2006-01-02 15:04:05" → ISO "2006-01-02T15:04:05Z"
+    return new Date(dateStr.replace(' ', 'T') + 'Z');
+}
+
 function formatDate(dateStr) {
-    const d = new Date(dateStr + 'Z'); // Treat as UTC
+    const d = parseUTC(dateStr);
     return d.toLocaleDateString('en-AU', {
         day: '2-digit',
         month: 'short',
@@ -18,7 +23,7 @@ function formatDate(dateStr) {
 }
 
 function formatDateTime(dateStr) {
-    const d = new Date(dateStr + 'Z');
+    const d = parseUTC(dateStr);
     return d.toLocaleDateString('en-AU', {
         day: '2-digit',
         month: 'short',
