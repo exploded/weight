@@ -30,10 +30,9 @@ function formatDateTime(dateStr) {
 function renderChart(weights) {
     const ctx = document.getElementById('weightChart').getContext('2d');
 
-    // Chart data is chronological (oldest first)
+    // Chart data is chronological (oldest first) as {x: Date, y: kg}
     const sorted = [...weights].reverse();
-    const labels = sorted.map(w => formatDate(w.created_at));
-    const data = sorted.map(w => w.weight_kg);
+    const data = sorted.map(w => ({ x: new Date(w.created_at), y: w.weight_kg }));
 
     if (chart) {
         chart.destroy();
@@ -42,7 +41,6 @@ function renderChart(weights) {
     chart = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: labels,
             datasets: [{
                 label: 'Weight (kg)',
                 data: data,
@@ -67,6 +65,9 @@ function renderChart(weights) {
                     borderColor: '#334155',
                     borderWidth: 1,
                     callbacks: {
+                        title: function(items) {
+                            return formatDateTime(items[0].raw.x.toISOString());
+                        },
                         label: function(ctx) {
                             return ctx.parsed.y.toFixed(2) + ' kg';
                         }
@@ -75,6 +76,16 @@ function renderChart(weights) {
             },
             scales: {
                 x: {
+                    type: 'time',
+                    time: {
+                        tooltipFormat: 'dd MMM yyyy',
+                        displayFormats: {
+                            day: 'dd MMM',
+                            week: 'dd MMM',
+                            month: 'MMM yyyy',
+                            year: 'yyyy'
+                        }
+                    },
                     ticks: { color: '#64748b', maxTicksLimit: 10 },
                     grid: { color: '#1e293b' }
                 },
