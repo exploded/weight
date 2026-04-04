@@ -91,6 +91,21 @@ tbody tr:hover {
     background: #334155;
 }
 
+.btn-delete {
+    background: none;
+    border: none;
+    color: #64748b;
+    cursor: pointer;
+    font-size: 0.875rem;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.btn-delete:hover {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.1);
+}
+
 .empty-state {
     text-align: center;
     padding: 48px 16px;

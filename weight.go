@@ -76,6 +76,7 @@ func makeHTTPServer(isProd bool) *http.Server {
 	mux.HandleFunc("/", handleIndex)
 	mux.HandleFunc("/favicon.ico", handleFavicon)
 	mux.HandleFunc("POST /api/weight", handlePostWeight)
+	mux.HandleFunc("DELETE /api/weight/{id}", handleDeleteWeight)
 	mux.HandleFunc("GET /api/weights", handleGetWeights)
 
 	path, _ := os.Getwd()
@@ -218,6 +219,22 @@ func handlePostWeight(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(weight)
+}
+
+func handleDeleteWeight(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, `{"error":"invalid id"}`, http.StatusBadRequest)
+		return
+	}
+
+	if err := deleteWeight(id); err != nil {
+		slog.Error("error deleting weight", "error", err)
+		http.Error(w, `{"error":"not found"}`, http.StatusNotFound)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func handleGetWeights(w http.ResponseWriter, r *http.Request) {

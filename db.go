@@ -116,3 +116,18 @@ func getWeights(days int) ([]Weight, error) {
 
 	return weights, nil
 }
+
+func deleteWeight(id int64) error {
+	result, err := db.Exec("DELETE FROM weights WHERE id = ?", id)
+	if err != nil {
+		return fmt.Errorf("delete weight: %w", err)
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("rows affected: %w", err)
+	}
+	if rows == 0 {
+		return fmt.Errorf("weight %d not found", id)
+	}
+	return nil
+}
