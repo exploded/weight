@@ -117,6 +117,18 @@ func getWeights(days int) ([]Weight, error) {
 	return weights, nil
 }
 
+func removeDuplicateWeights() (int64, error) {
+	result, err := db.Exec(`
+		DELETE FROM weights WHERE id NOT IN (
+			SELECT MIN(id) FROM weights GROUP BY weight_kg, created_at
+		)
+	`)
+	if err != nil {
+		return 0, fmt.Errorf("remove duplicates: %w", err)
+	}
+	return result.RowsAffected()
+}
+
 func deleteWeight(id int64) error {
 	result, err := db.Exec("DELETE FROM weights WHERE id = ?", id)
 	if err != nil {

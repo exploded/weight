@@ -135,6 +135,12 @@ func main() {
 	}
 	defer closeDB()
 
+	if removed, err := removeDuplicateWeights(); err != nil {
+		slog.Error("failed to remove duplicate weights", "error", err)
+	} else if removed > 0 {
+		slog.Info("removed duplicate weights", "count", removed)
+	}
+
 	slog.Info("configuration", "prod", isProd, "port", httpPort, "db", dbPath)
 
 	httpSrv := makeHTTPServer(isProd)

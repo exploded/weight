@@ -130,7 +130,6 @@ async function loadData() {
 }
 
 async function deleteWeightById(id) {
-    if (!confirm('Delete this reading?')) return;
     try {
         const resp = await fetch(`/api/weight/${id}`, { method: 'DELETE' });
         if (!resp.ok) throw new Error('Failed to delete');
