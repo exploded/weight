@@ -105,16 +105,12 @@ function renderTable(weights) {
     const tbody = document.getElementById('weightBody');
 
     if (weights.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="3" class="empty-state">No readings yet</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="2" class="empty-state">No readings yet</td></tr>';
         return;
     }
 
     tbody.innerHTML = weights.map(w =>
-        `<tr>
-            <td>${formatDateTime(w.created_at)}</td>
-            <td>${w.weight_kg.toFixed(2)}</td>
-            <td><button class="btn-delete" data-id="${w.id}" title="Delete">&#x2715;</button></td>
-        </tr>`
+        `<tr><td>${formatDateTime(w.created_at)}</td><td>${w.weight_kg.toFixed(2)}</td></tr>`
     ).join('');
 }
 
@@ -128,21 +124,6 @@ async function loadData() {
         console.error('Error loading weights:', err);
     }
 }
-
-async function deleteWeightById(id) {
-    try {
-        const resp = await fetch(`/api/weight/${id}`, { method: 'DELETE' });
-        if (!resp.ok) throw new Error('Failed to delete');
-        loadData();
-    } catch (err) {
-        console.error('Error deleting weight:', err);
-    }
-}
-
-document.getElementById('weightBody').addEventListener('click', function(e) {
-    const btn = e.target.closest('.btn-delete');
-    if (btn) deleteWeightById(btn.dataset.id);
-});
 
 document.getElementById('daysFilter').addEventListener('change', loadData);
 

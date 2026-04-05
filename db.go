@@ -50,8 +50,24 @@ type Weight struct {
 	CreatedAt string  `json:"created_at"`
 }
 
+var errDuplicate = fmt.Errorf("duplicate weight reading")
+
 func insertWeight(weightKg float64) (Weight, error) {
 	now := time.Now().UTC().Format(time.RFC3339)
+
+	// Reject if same weight was recorded in the last minute
+	var count int
+	err := db.QueryRow(
+		"SELECT COUNT(*) FROM weights WHERE weight_kg = ? AND created_at >= datetime(?, '-1 minute')",
+		weightKg, now,
+	).Scan(&count)
+	if err != nil {
+		return Weight{}, fmt.Errorf("check duplicate: %w", err)
+	}
+	if count > 0 {
+		return Weight{}, errDuplicate
+	}
+
 	result, err := db.Exec(
 		"INSERT INTO weights (weight_kg, created_at) VALUES (?, ?)",
 		weightKg, now,
@@ -118,9 +134,16 @@ func getWeights(days int) ([]Weight, error) {
 }
 
 func removeDuplicateWeights() (int64, error) {
+	// For each date, keep only the row with the lowest weight
 	result, err := db.Exec(`
 		DELETE FROM weights WHERE id NOT IN (
-			SELECT MIN(id) FROM weights GROUP BY weight_kg, created_at
+			SELECT id FROM (
+				SELECT id, ROW_NUMBER() OVER (
+					PARTITION BY DATE(created_at)
+					ORDER BY weight_kg ASC, id ASC
+				) AS rn
+				FROM weights
+			) WHERE rn = 1
 		)
 	`)
 	if err != nil {
@@ -129,17 +152,3 @@ func removeDuplicateWeights() (int64, error) {
 	return result.RowsAffected()
 }
 
-func deleteWeight(id int64) error {
-	result, err := db.Exec("DELETE FROM weights WHERE id = ?", id)
-	if err != nil {
-		return fmt.Errorf("delete weight: %w", err)
-	}
-	rows, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("rows affected: %w", err)
-	}
-	if rows == 0 {
-		return fmt.Errorf("weight %d not found", id)
-	}
-	return nil
-}
