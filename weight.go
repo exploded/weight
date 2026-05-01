@@ -19,6 +19,10 @@ import (
 
 var discordWebhookURL string
 
+// assetVersion is set at startup and appended to static asset URLs to bust
+// browser caches whenever the server is redeployed.
+var assetVersion = strconv.FormatInt(time.Now().Unix(), 10)
+
 // Template cache
 var templates *template.Template
 
@@ -179,7 +183,7 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 
 	if templates != nil {
-		if err := templates.ExecuteTemplate(w, "index.html", nil); err != nil {
+		if err := templates.ExecuteTemplate(w, "index.html", map[string]string{"V": assetVersion}); err != nil {
 			slog.Error("error executing index template", "error", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		}
@@ -190,7 +194,7 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 			slog.Error("error parsing index template", "error", err)
 			return
 		}
-		if err := t.Execute(w, nil); err != nil {
+		if err := t.Execute(w, map[string]string{"V": assetVersion}); err != nil {
 			slog.Error("error executing index template", "error", err)
 		}
 	}
