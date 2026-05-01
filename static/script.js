@@ -101,6 +101,41 @@ function renderChart(weights) {
     });
 }
 
+function renderSummary(weights) {
+    const el = document.getElementById('summary');
+
+    if (weights.length < 2) {
+        el.innerHTML = '';
+        return;
+    }
+
+    // weights are DESC by created_at — first is newest, last is oldest
+    const newest = weights[0];
+    const oldest = weights[weights.length - 1];
+    const changeKg = newest.weight_kg - oldest.weight_kg;
+    const changePct = (changeKg / oldest.weight_kg) * 100;
+    const spanDays = (new Date(newest.created_at) - new Date(oldest.created_at)) / (1000 * 60 * 60 * 24);
+    const rate = spanDays > 0 ? (changeKg / spanDays) * 7 : 0;
+
+    const sign = changeKg > 0 ? '+' : '';
+    const dir = changeKg > 0 ? 'up' : changeKg < 0 ? 'down' : '';
+
+    el.innerHTML = `
+        <div class="summary-card">
+            <div class="label">Total change</div>
+            <div class="value ${dir}">${sign}${changeKg.toFixed(2)} kg</div>
+        </div>
+        <div class="summary-card">
+            <div class="label">Percent change</div>
+            <div class="value ${dir}">${sign}${changePct.toFixed(2)}%</div>
+        </div>
+        <div class="summary-card">
+            <div class="label">Average rate</div>
+            <div class="value ${dir}">${sign}${rate.toFixed(2)} kg/week</div>
+        </div>
+    `;
+}
+
 function renderTable(weights) {
     const tbody = document.getElementById('weightBody');
 
@@ -114,11 +149,22 @@ function renderTable(weights) {
     ).join('');
 }
 
+function daysFromFilter(value) {
+    if (value.startsWith('since:')) {
+        const start = new Date(value.slice('since:'.length) + 'T00:00:00');
+        const diffMs = Date.now() - start.getTime();
+        const days = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+        return days > 0 ? days : 1;
+    }
+    return parseInt(value, 10);
+}
+
 async function loadData() {
-    const days = parseInt(document.getElementById('daysFilter').value, 10);
+    const days = daysFromFilter(document.getElementById('daysFilter').value);
     try {
         const weights = await fetchWeights(days);
         renderChart(weights);
+        renderSummary(weights);
         renderTable(weights);
     } catch (err) {
         console.error('Error loading weights:', err);
