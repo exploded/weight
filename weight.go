@@ -79,6 +79,7 @@ func makeHTTPServer(isProd bool) *http.Server {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", handleIndex)
 	mux.HandleFunc("/favicon.ico", handleFavicon)
+	mux.HandleFunc("GET /health", handleHealth)
 	mux.HandleFunc("POST /api/weight", handlePostWeight)
 mux.HandleFunc("GET /api/weights", handleGetWeights)
 
@@ -256,6 +257,19 @@ func handleGetWeights(w http.ResponseWriter, r *http.Request) {
 
 func handleFavicon(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "favicon.ico")
+}
+
+// handleHealth is the uptime-monitor endpoint. It pings the database as well as
+// answering, so a live process sitting on a broken DB reads as down rather than
+// up -- every route here reads or writes weights.
+func handleHealth(w http.ResponseWriter, r *http.Request) {
+	if err := db.PingContext(r.Context()); err != nil {
+		http.Error(w, "db unhealthy", http.StatusServiceUnavailable)
+		return
+	}
+	w.Header().Set("Content-Type", "text/plain")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Write([]byte("ok"))
 }
 
 func notifyDiscord(w Weight) {
