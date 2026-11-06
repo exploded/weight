@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -11,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -18,6 +20,10 @@ import (
 )
 
 var discordWebhookURL string
+
+// apiKey is the shared key the scale must send on POST /api/weight, from
+// WEIGHT_API_KEY in .env. When it is empty, every reading is rejected.
+var apiKey string
 
 // assetVersion is set at startup and appended to static asset URLs to bust
 // browser caches whenever the server is redeployed.
@@ -81,7 +87,7 @@ func makeHTTPServer(isProd bool) *http.Server {
 	mux.HandleFunc("/favicon.ico", handleFavicon)
 	mux.HandleFunc("GET /health", handleHealth)
 	mux.HandleFunc("POST /api/weight", handlePostWeight)
-mux.HandleFunc("GET /api/weights", handleGetWeights)
+	mux.HandleFunc("GET /api/weights", handleGetWeights)
 
 	path, _ := os.Getwd()
 	slog.Info("working directory", "path", path)
@@ -126,6 +132,12 @@ func main() {
 		slog.Warn("weight app started, log shipping active", "endpoint", monitorURL+"/api/logs")
 	} else {
 		slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})))
+	}
+
+	// Read after the logger is set up so the warning ships to monitor.
+	apiKey = os.Getenv("WEIGHT_API_KEY")
+	if apiKey == "" {
+		slog.Warn("WEIGHT_API_KEY not set: POST /api/weight will reject every reading")
 	}
 
 	// Initialize database
@@ -205,7 +217,30 @@ type postWeightRequest struct {
 	WeightKg float64 `json:"weight_kg"`
 }
 
+// hasValidKey reports whether r carries the shared key as
+// "Authorization: Bearer <key>". The key goes in Authorization because Caddy
+// blanks that header in its access log; a custom header such as X-API-Key
+// would be logged, and shipped to monitor, in clear.
+func hasValidKey(r *http.Request) bool {
+	token, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+	return ok && subtle.ConstantTimeCompare([]byte(token), []byte(apiKey)) == 1
+}
+
 func handlePostWeight(w http.ResponseWriter, r *http.Request) {
+	// Checked first: with an empty key, "Bearer " with no token would match.
+	if apiKey == "" {
+		slog.Error("rejected weight reading: WEIGHT_API_KEY not set")
+		http.Error(w, `{"error":"API key not configured"}`, http.StatusServiceUnavailable)
+		return
+	}
+	if !hasValidKey(r) {
+		slog.Warn("rejected weight reading: missing or wrong API key",
+			"client", r.Header.Get("X-Forwarded-For"), "user_agent", r.UserAgent())
+		w.Header().Set("WWW-Authenticate", "Bearer")
+		http.Error(w, `{"error":"unauthorised"}`, http.StatusUnauthorized)
+		return
+	}
+
 	var req postWeightRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, `{"error":"invalid JSON"}`, http.StatusBadRequest)

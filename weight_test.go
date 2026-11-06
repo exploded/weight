@@ -25,12 +25,24 @@ func setupTestDB(t *testing.T) {
 	}
 }
 
+const testAPIKey = "test-key-0123456789abcdef"
+
+// setAPIKey sets the shared key for one test and restores it afterwards.
+func setAPIKey(t *testing.T, key string) {
+	t.Helper()
+	old := apiKey
+	apiKey = key
+	t.Cleanup(func() { apiKey = old })
+}
+
 func TestPostWeight(t *testing.T) {
 	setupTestDB(t)
+	setAPIKey(t, testAPIKey)
 
 	body := `{"weight_kg": 85.5}`
 	req := httptest.NewRequest("POST", "/api/weight", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+testAPIKey)
 	w := httptest.NewRecorder()
 
 	handlePostWeight(w, req)
@@ -53,6 +65,7 @@ func TestPostWeight(t *testing.T) {
 
 func TestPostWeightInvalid(t *testing.T) {
 	setupTestDB(t)
+	setAPIKey(t, testAPIKey)
 
 	tests := []struct {
 		name string
@@ -68,10 +81,56 @@ func TestPostWeightInvalid(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest("POST", "/api/weight", bytes.NewBufferString(tt.body))
+			req.Header.Set("Authorization", "Bearer "+testAPIKey)
 			w := httptest.NewRecorder()
 			handlePostWeight(w, req)
 			if w.Code != tt.code {
 				t.Errorf("expected %d, got %d", tt.code, w.Code)
+			}
+		})
+	}
+}
+
+func TestPostWeightAuth(t *testing.T) {
+	tests := []struct {
+		name    string
+		key     string // server's WEIGHT_API_KEY
+		headers map[string]string
+		code    int
+	}{
+		{"no header", testAPIKey, nil, http.StatusUnauthorized},
+		{"wrong key", testAPIKey, map[string]string{"Authorization": "Bearer wrong"}, http.StatusUnauthorized},
+		{"key without Bearer", testAPIKey, map[string]string{"Authorization": testAPIKey}, http.StatusUnauthorized},
+		{"wrong scheme", testAPIKey, map[string]string{"Authorization": "Basic " + testAPIKey}, http.StatusUnauthorized},
+		{"key prefix only", testAPIKey, map[string]string{"Authorization": "Bearer " + testAPIKey[:8]}, http.StatusUnauthorized},
+		{"key in X-API-Key", testAPIKey, map[string]string{"X-API-Key": testAPIKey}, http.StatusUnauthorized},
+		{"correct key", testAPIKey, map[string]string{"Authorization": "Bearer " + testAPIKey}, http.StatusCreated},
+		{"server key unset", "", nil, http.StatusServiceUnavailable},
+		{"server key unset, empty token", "", map[string]string{"Authorization": "Bearer "}, http.StatusServiceUnavailable},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setupTestDB(t)
+			setAPIKey(t, tt.key)
+
+			req := httptest.NewRequest("POST", "/api/weight", bytes.NewBufferString(`{"weight_kg": 85.5}`))
+			for k, v := range tt.headers {
+				req.Header.Set(k, v)
+			}
+			w := httptest.NewRecorder()
+			handlePostWeight(w, req)
+
+			if w.Code != tt.code {
+				t.Fatalf("expected %d, got %d: %s", tt.code, w.Code, w.Body.String())
+			}
+			// A rejected request must not store anything.
+			weights, err := getWeights(0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if want := map[bool]int{true: 1, false: 0}[tt.code == http.StatusCreated]; len(weights) != want {
+				t.Errorf("expected %d stored readings, got %d", want, len(weights))
 			}
 		})
 	}

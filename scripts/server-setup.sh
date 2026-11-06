@@ -79,6 +79,11 @@ PORT=8990
 # Database file path
 DB_PATH=/var/www/weight/weight.db
 
+# Shared key the scale sends as "Authorization: Bearer <key>" on POST /api/weight.
+# Required: while it's empty, every reading is rejected with 503.
+# Generate one with: openssl rand -hex 32
+WEIGHT_API_KEY=
+
 # Monitor portal log shipping (optional)
 MONITOR_URL=
 MONITOR_API_KEY=
