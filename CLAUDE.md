@@ -53,11 +53,14 @@ Routes: `GET /` page, `POST /api/weight` (JSON `{"weight_kg": …}`),
   `GET /api/weights` and the dashboard stay public.
 - A repeat of the same weight within 60 s returns **409**, and the scale firmware
   treats 409 as "already stored" and stops retrying: keep that contract.
-- `created_at` is stored as RFC 3339 text (`2026-11-06T01:02:03Z`). Compare it
-  with a cutoff formatted in Go (`t.UTC().Format(time.RFC3339)`), not SQLite's
-  `datetime()`, which returns `2026-11-06 01:02:03`: ' ' sorts before 'T', so the
-  comparison is wrong for any row on the cutoff's date. `insertWeight` was fixed
-  for this; `getWeights`' `days` filter still uses `datetime('now', ?)`.
+- `created_at` is text in **two formats**: RFC 3339 (`2026-11-06T01:02:03Z`) since
+  March 2026 (e581268), and `2026-11-06 01:02:03` before that (most of prod's
+  rows). ' ' sorts before 'T', so never compare or sort raw `created_at` against
+  SQLite's `datetime()` or across formats. Format cutoffs in Go
+  (`t.UTC().Format(time.RFC3339)`) and compare against the `createdAtRFC3339`
+  expression in `db.go` (strftime to RFC 3339). The `insertWeight` duplicate check
+  compares raw `created_at`; that's safe only because rows from the last minute
+  are always RFC 3339.
 - Static asset URLs get a `?v=<startup-unix-time>` cache-buster (`assetVersion`
   in `weight.go`, commit 63c19aa) — new JS/CSS shows up after redeploy without
   manual cache clearing; keep using it for any new asset links.

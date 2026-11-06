@@ -214,6 +214,72 @@ func TestGetWeights(t *testing.T) {
 	}
 }
 
+// Rows just either side of the cutoff, in both stored formats: RFC 3339 (since
+// March 2026) and the older "2006-01-02 15:04:05". Each pair shares the
+// cutoff's date, which is where a plain text comparison goes wrong.
+func TestGetWeightsDaysCutoff(t *testing.T) {
+	setupTestDB(t)
+
+	const days = 7
+	cutoff := time.Now().UTC().AddDate(0, 0, -days)
+	const legacy = "2006-01-02 15:04:05"
+	rows := []struct {
+		kg        float64
+		createdAt string
+		want      bool
+	}{
+		{70.1, cutoff.Add(time.Minute).Format(time.RFC3339), true},
+		{70.2, cutoff.Add(-time.Minute).Format(time.RFC3339), false},
+		{70.3, cutoff.Add(time.Minute).Format(legacy), true},
+		{70.4, cutoff.Add(-time.Minute).Format(legacy), false},
+	}
+	for _, r := range rows {
+		if _, err := db.Exec("INSERT INTO weights (weight_kg, created_at) VALUES (?, ?)", r.kg, r.createdAt); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	got, err := getWeights(days)
+	if err != nil {
+		t.Fatal(err)
+	}
+	returned := map[float64]bool{}
+	for _, w := range got {
+		returned[w.WeightKg] = true
+	}
+	for _, r := range rows {
+		if returned[r.kg] != r.want {
+			t.Errorf("%v kg at %s: returned=%v, want %v", r.kg, r.createdAt, returned[r.kg], r.want)
+		}
+	}
+}
+
+// The frontend takes weights[0] as newest, so order must be by time even when
+// one day holds both formats.
+func TestGetWeightsOrderMixedFormats(t *testing.T) {
+	setupTestDB(t)
+
+	for _, r := range []struct {
+		kg        float64
+		createdAt string
+	}{
+		{80.0, "2026-03-29 23:00:00"},  // legacy, latest
+		{80.1, "2026-03-29T10:00:00Z"}, // RFC 3339, earlier the same day
+	} {
+		if _, err := db.Exec("INSERT INTO weights (weight_kg, created_at) VALUES (?, ?)", r.kg, r.createdAt); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	got, err := getWeights(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || got[0].WeightKg != 80.0 {
+		t.Errorf("expected the 23:00 reading first, got %+v", got)
+	}
+}
+
 func TestGetWeightsEmpty(t *testing.T) {
 	setupTestDB(t)
 

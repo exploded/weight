@@ -94,18 +94,25 @@ func insertWeight(weightKg float64) (Weight, error) {
 	}, nil
 }
 
+// createdAtRFC3339 is created_at converted to RFC 3339 in SQL. Rows from
+// before March 2026 are stored as "2006-01-02 15:04:05" and newer rows as
+// "2006-01-02T15:04:05Z" (both UTC). Mixed formats don't compare correctly as
+// text (' ' sorts before 'T'), so filter and sort on this instead.
+const createdAtRFC3339 = "strftime('%Y-%m-%dT%H:%M:%SZ', created_at)"
+
 func getWeights(days int) ([]Weight, error) {
 	var rows *sql.Rows
 	var err error
 
 	if days > 0 {
+		cutoff := time.Now().UTC().AddDate(0, 0, -days).Format(time.RFC3339)
 		rows, err = db.Query(
-			"SELECT id, weight_kg, created_at FROM weights WHERE created_at >= datetime('now', ?) ORDER BY created_at DESC",
-			fmt.Sprintf("-%d days", days),
+			"SELECT id, weight_kg, created_at FROM weights WHERE "+createdAtRFC3339+" >= ? ORDER BY "+createdAtRFC3339+" DESC",
+			cutoff,
 		)
 	} else {
 		rows, err = db.Query(
-			"SELECT id, weight_kg, created_at FROM weights ORDER BY created_at DESC",
+			"SELECT id, weight_kg, created_at FROM weights ORDER BY " + createdAtRFC3339 + " DESC",
 		)
 	}
 	if err != nil {
