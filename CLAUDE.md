@@ -51,6 +51,13 @@ Routes: `GET /` page, `POST /api/weight` (JSON `{"weight_kg": …}`),
   clear. Keep it in `Authorization`: Caddy's JSON access log records every other
   header (and the URI) and ships to monitor, but blanks `Authorization`.
   `GET /api/weights` and the dashboard stay public.
+- A repeat of the same weight within 60 s returns **409**, and the scale firmware
+  treats 409 as "already stored" and stops retrying: keep that contract.
+- `created_at` is stored as RFC 3339 text (`2026-11-06T01:02:03Z`). Compare it
+  with a cutoff formatted in Go (`t.UTC().Format(time.RFC3339)`), not SQLite's
+  `datetime()`, which returns `2026-11-06 01:02:03`: ' ' sorts before 'T', so the
+  comparison is wrong for any row on the cutoff's date. `insertWeight` was fixed
+  for this; `getWeights`' `days` filter still uses `datetime('now', ?)`.
 - Static asset URLs get a `?v=<startup-unix-time>` cache-buster (`assetVersion`
   in `weight.go`, commit 63c19aa) — new JS/CSS shows up after redeploy without
   manual cache clearing; keep using it for any new asset links.

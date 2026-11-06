@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
+	"time"
 )
 
 func setupTestDB(t *testing.T) {
@@ -133,6 +134,54 @@ func TestPostWeightAuth(t *testing.T) {
 				t.Errorf("expected %d stored readings, got %d", want, len(weights))
 			}
 		})
+	}
+}
+
+func TestInsertWeightDuplicateWindow(t *testing.T) {
+	tests := []struct {
+		name     string
+		existing float64       // weight already stored
+		age      time.Duration // how long ago it was stored
+		wantDup  bool
+	}{
+		{"same weight 2 minutes ago", 85.5, 2 * time.Minute, false},
+		{"same weight 30 seconds ago", 85.5, 30 * time.Second, true},
+		{"different weight 30 seconds ago", 85.4, 30 * time.Second, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setupTestDB(t)
+			createdAt := time.Now().UTC().Add(-tt.age).Format(time.RFC3339)
+			if _, err := db.Exec("INSERT INTO weights (weight_kg, created_at) VALUES (?, ?)", tt.existing, createdAt); err != nil {
+				t.Fatal(err)
+			}
+
+			_, err := insertWeight(85.5)
+			if tt.wantDup && err != errDuplicate {
+				t.Errorf("expected errDuplicate, got %v", err)
+			}
+			if !tt.wantDup && err != nil {
+				t.Errorf("expected reading to be accepted, got %v", err)
+			}
+		})
+	}
+}
+
+// The scale treats 409 as "already stored" and stops retrying, so a repeat of
+// the same reading must keep returning 409.
+func TestPostWeightDuplicateReturns409(t *testing.T) {
+	setupTestDB(t)
+	setAPIKey(t, testAPIKey)
+
+	for i, want := range []int{http.StatusCreated, http.StatusConflict} {
+		req := httptest.NewRequest("POST", "/api/weight", bytes.NewBufferString(`{"weight_kg": 85.5}`))
+		req.Header.Set("Authorization", "Bearer "+testAPIKey)
+		w := httptest.NewRecorder()
+		handlePostWeight(w, req)
+		if w.Code != want {
+			t.Fatalf("post %d: expected %d, got %d: %s", i+1, want, w.Code, w.Body.String())
+		}
 	}
 }
 

@@ -53,13 +53,19 @@ type Weight struct {
 var errDuplicate = fmt.Errorf("duplicate weight reading")
 
 func insertWeight(weightKg float64) (Weight, error) {
-	now := time.Now().UTC().Format(time.RFC3339)
+	t := time.Now().UTC()
+	now := t.Format(time.RFC3339)
 
-	// Reject if same weight was recorded in the last minute
+	// Reject if same weight was recorded in the last minute. created_at is
+	// RFC 3339 text, so the cutoff must be too: fixed-width UTC RFC 3339
+	// strings sort in time order. Don't use SQLite's datetime() here: it
+	// returns "2006-01-02 15:04:05", and because ' ' sorts before 'T', every
+	// earlier reading on the same UTC day compared as within the minute.
+	cutoff := t.Add(-time.Minute).Format(time.RFC3339)
 	var count int
 	err := db.QueryRow(
-		"SELECT COUNT(*) FROM weights WHERE weight_kg = ? AND created_at >= datetime(?, '-1 minute')",
-		weightKg, now,
+		"SELECT COUNT(*) FROM weights WHERE weight_kg = ? AND created_at >= ?",
+		weightKg, cutoff,
 	).Scan(&count)
 	if err != nil {
 		return Weight{}, fmt.Errorf("check duplicate: %w", err)
@@ -151,4 +157,3 @@ func removeDuplicateWeights() (int64, error) {
 	}
 	return result.RowsAffected()
 }
-
